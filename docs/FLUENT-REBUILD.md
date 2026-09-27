@@ -18,6 +18,7 @@ Single source of truth for continuing this work in a new session. Read this befo
   - `9a0a168` WinUI 3 rebuild + Core collector
   - `a1951e4` per-app network throughput (ETW) + Path column
   - `f3189f3` remote host names
+  - `f80acc2` this handoff document
 - The WinForms project is untouched and still in the solution; retire it only after feature parity.
 
 ## 3. Build, run, test
@@ -38,7 +39,7 @@ src\BetterTaskManager.Fluent\bin\Debug\net11.0-windows10.0.26100.0\win-x64\Bette
 - **Elevated copies** cannot be closed, clicked or captured from a non-elevated shell or computer-use (UIPI). Ask Kaan to close them.
 - **computer-use grant**: request the lowercase basename `bettertaskmanager.fluent.exe`; the name "Better Task Manager" resolves to the installed WinForms app. The window may start hidden behind others: restore with `ShowWindow(h, 9)` + `SetForegroundWindow`.
 - When the screen is busy (another session), capture the window with `PrintWindow(hwnd, dc, 2)` after `ShowWindow(h, 4)` (no focus steal).
-- Admin-only features (ETW bandwidth, live DNS) were verified with a **separate elevated console harness** that references Core (`Start-Process -Verb RunAs`, writes results to a file); Kaan approves the UAC prompt. The harness lived in the session scratchpad; recreate it when needed (console exe, `ProjectReference` to Core, call `MonitorEngine.Start()`, set `Paused = true`, then drive `Collect()` once per second).
+- Admin-only features (ETW bandwidth, live DNS) were verified with a **separate elevated console harness** that references Core (`Start-Process -Verb RunAs`, writes results to a file); Kaan approves the UAC prompt. The harness lived in the session scratchpad; recreate it when needed (console exe, `ProjectReference` to Core, call `MonitorEngine.Start()`, set `Paused = true`, then drive `Collect()` once per second). **Always construct it as `new MonitorEngine("BTM-Test")`**: ETW session names are machine-wide, and a harness using the app's default names (`BetterTaskManager-Network`/`-Dns`) stops the running app's traces. That happened once and made Kaan's elevated window show "Admin" in the Network column. Since then the app restarts a lost trace within about 10 s and shows "Paused" with the reason in the tooltip while it waits. This was verified with an elevated harness that took over the sessions deliberately.
 - The first click after a MenuFlyout closes is consumed by light-dismiss (WinUI behaviour, not a bug).
 - In Git Bash, very long `python - <<'EOF'` heredocs with many quotes sometimes fail to parse; write patch scripts to a file and run them.
 
