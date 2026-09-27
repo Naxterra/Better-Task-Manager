@@ -16,15 +16,17 @@ Branch `fluent-ui`. The WinForms app in `src/BetterTaskManager` stays untouched 
 - **No UI work while minimized** (`MonitorHost.ViewSuspended`); chart history keeps recording.
 - **Firewall rule names are unchanged** (`BetterTaskManager Block <sha1-12>`), so rules from the WinForms app are recognised. Standard users get one UAC prompt per change via the exe's `--firewall-block/--firewall-unblock` helper mode.
 - **End task** matches Task Manager (no prompt for normal apps), verifies the PID's creation time before killing, warns for critical processes, and makes tree-kill an explicit separate action.
+- **Per-app network throughput** comes from the kernel's TCP/IP ETW events (`BandwidthMonitor`, session `BetterTaskManager-Network`), the same source Resource Monitor uses. It needs elevation; standard users see connection counts and an explanation. Loopback is excluded. The session is flushed (`ControlTrace` flush) before each snapshot, otherwise the kernel's ~1 s buffer delivery makes rates alternate between 0 and double. TCP rates are matched to connection rows by 5-tuple; UDP by process and local port.
 
 ## Measured (2026-09-27, 20 logical CPUs, ~300 processes)
 
 - Process read: 3.7 ms; full snapshot incl. network tables: ~27 ms.
 - App at 1 s refresh: ~2.7% of one core with the Processes page visible, ~3% minimized.
+- Bandwidth accuracy: curl capped at 2 MiB/s (16.8 Mbit/s) read 16.3–16.8 Mbit/s per tick (avg 16.6); a 25,000,000-byte download was counted as 25,040,918 bytes (TLS overhead).
 
 ## Next
 
-1. Per-app network throughput (Mbit/s) and DNS names via ETW (`Microsoft-Windows-Kernel-Network`, `Microsoft-Windows-DNS-Client`); requires elevation.
+1. Remote host names via the DNS-Client ETW provider, so connections show domains instead of bare IPs.
 2. Background service so connection history keeps recording while the window is closed; port `NetworkHistoryStore`.
 3. German localization (resource-based, UI strings only — never user data).
 4. Details view (all columns, per-process user), startup apps, efficiency mode.
