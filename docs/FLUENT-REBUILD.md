@@ -19,6 +19,8 @@ Single source of truth for continuing this work in a new session. Read this befo
   - `a1951e4` per-app network throughput (ETW) + Path column
   - `f3189f3` remote host names
   - `f80acc2` this handoff document
+  - `3802e22` restart ETW traces stopped by another program; session-name prefix
+  - (next commit) background history service + History page
 - The WinForms project is untouched and still in the solution; retire it only after feature parity.
 
 ## 3. Build, run, test
@@ -57,8 +59,16 @@ src/BetterTaskManager.Core      (net11.0-windows10.0.26100.0, no UI)
   Network/HostNameResolver.cs   IP → host name: DNS cache (WMI) + DNS-Client ETW (elevated) + PTR-only DnsQuery fallback
   Firewall/FirewallRules.cs     netsh outbound block rules; names "BetterTaskManager Block <SHA1(lower path)[..12]>" (compatible with WinForms app)
   Firewall/CommandRunner.cs     process runner with timeout (copied)
-  Monitoring/MonitorEngine.cs   background loop → immutable MonitorSnapshot per interval
-  Monitoring/Samples.cs         ProcessSample, ConnectionSample, MemoryBreakdown, SystemSample, MonitorSnapshot
+  Monitoring/MonitorEngine.cs   background loop → immutable MonitorSnapshot per interval; ctor takes the ETW session-name prefix
+  Monitoring/Samples.cs         ProcessSample, ConnectionSample, FlowSample (per-socket bytes incl. UDP remote), MemoryBreakdown, SystemSample, MonitorSnapshot
+  History/HistoryStore.cs       SQLite (Microsoft.Data.Sqlite): tables meta, connections, app_usage; write batch, prune, read queries
+  History/HistoryRecorder.cs    snapshots → TCP rows (from the table) + UDP/TCP flows (from ETW) + bytes per (local day, app); flush every 10 s
+  History/HistoryServiceControl.cs  service name/state, Install (copy to Program Files, sc create/config, failure actions, start), Uninstall
+
+src/BetterTaskManager.HistoryService  (console exe, framework-dependent, ServiceBase — no Hosting package)
+  Program.cs                    service mode, or `--console [--db path] [--seconds n]` for tests (own ETW prefix BetterTaskManager-HistoryTest)
+  HistoryWindowsService.cs      OnStart: protected ACL on the data folder (SYSTEM/Admins full, Users read), log to service.log (1 MB, rotates)
+  HistoryWorker.cs              MonitorEngine("BetterTaskManager-History", 2 s) → HistoryRecorder
 
 src/BetterTaskManager.Fluent    (WinUI 3 unpackaged, self-contained WinAppSDK, DISABLE_XAML_GENERATED_MAIN)
   Program.cs                    custom Main: --firewall-block/--firewall-unblock helper mode, --wait-for-pid, single-instance mutex
@@ -69,11 +79,13 @@ src/BetterTaskManager.Fluent    (WinUI 3 unpackaged, self-contained WinAppSDK, D
   Services/IconCache.cs         System.Drawing Icon.ExtractIcon(path,0,32) → PNG → BitmapImage; stock app icon fallback
   Services/ProcessActions.cs    End (creation-time checked), open location, Properties (ShellExecuteEx "properties"), copy
   Services/AppSettings.cs, Format.cs
+  Services/HistoryServiceSetup.cs  turn recording on/off; elevated helper `--install-history-service/--uninstall-history-service <resultFile>`
   ViewModels/Infrastructure.cs  ObservableObject, SlotCollection, ColumnLayout (shared widths, persisted with prefix), Heat
   ViewModels/ProcessTree.cs     pure grouping/sorting/search → ProcessRowData list (sections Apps/Background)
   ViewModels/ProcessSlot.cs, ProcessesViewModel.cs, NetworkViewModel.cs (NetworkSlot)
   Controls/TrendChart.cs        Polyline/Polygon area chart; Stroke/SecondStroke are DependencyProperties
-  Views/ProcessesPage, PerformancePage, NetworkPage, SettingsPage
+  Views/ProcessesPage, PerformancePage, NetworkPage, HistoryPage, SettingsPage
+  csproj target BundleHistoryService  builds the service and copies it to <app output>\HistoryService (also on publish)
 ```
 
 Data flow: `MonitorEngine` (thread pool, `Interval` default 1 s) → `SnapshotReady` → `MonitorHost` (keeps only the newest pending snapshot, `DispatcherQueue.TryEnqueue`) → `Updated` → the visible page calls its view model's `Refresh()`.
@@ -115,9 +127,20 @@ Built but not yet seen on screen or exercised by hand: Path column, Processes Ne
 
 Known limitations: English only; theme brushes resolved in code-behind (Performance legend) follow the app theme at page creation; per-app transfer totals reset when the app restarts (no persistence yet); IPv6 link-local addresses are not named by design.
 
-## 8. Next: background history service (Portmaster-style)
+## 8. Background history service (Portmaster-style) — built, admin path not yet verified
 
-Goal: keep recording connections and traffic while the window is closed, and show history in the UI. Not started.
+Implemented as planned below, with these decisions:
+- **Journal mode DELETE, not WAL**: WAL readers need write access to `-shm`; standard users only get read access to the data folder.
+- **Data folder ACL** is set by the service (protected: SYSTEM/Admins full, Users read), because ProgramData lets any user create files in subfolders.
+- **Binaries run from `%ProgramFiles%\Better Task Manager\HistoryService`** (install copies them there): a LocalSystem service must not run from a user-writable folder like the dev `bin`. Updating = toggle on again (stops, copies, reconfigures, starts).
+- Service name `BetterTaskManagerHistory`, start delayed-auto, restart on failure (60 s ×3). Uninstall keeps `history.db`.
+- **App key** = lowercase path with version numbers replaced by `*` (`app-*`, `claude_*_x64__…`), so updates don't split an app's history; svchost = `svchost:<first service>`; unknown/exited = `pid:<n>`.
+- Loopback excluded; TCP rows come from the connection table (idle connections count), UDP rows only from ETW flows (only they know the remote side, e.g. QUIC), UDP flow ends after 60 s idle.
+- UI: History page (Ctrl+4) = apps by data used (range Today / 7 / 30 days) + connection log (latest 1000, search box filters via SQL LIKE, auto-refresh 10 s); Settings → History card with toggle + privacy note.
+
+Verified: non-elevated `--console` run recorded 50 TCP connections across 14 apps (21 named) and the reader harness read them back; History page empty state renders. **Not yet verified: byte counts from ETW in the service, install/uninstall via the toggle (needs UAC), running as LocalSystem, the populated History page.**
+
+Original plan:
 
 1. New project `src/BetterTaskManager.Service` (console, `Microsoft.Extensions.Hosting.WindowsServices`), references Core, runs as LocalSystem so ETW works without UAC prompts.
 2. Collector loop every 1–2 s: connections + `BandwidthMonitor` + `HostNameResolver` + process identity (path, description). Reuse `MonitorEngine` if practical; the service does not need windows/icons.
