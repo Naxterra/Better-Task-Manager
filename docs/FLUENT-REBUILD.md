@@ -12,15 +12,16 @@ Single source of truth for continuing this work in a new session. Read this befo
 
 ## 2. Repository state
 
-- Local clone: `D:\KI\Codex\Windows Apps\Better-Task-Manager`.
-- Branches: `main` = stale v1.0 WinForms; `codex/better-task-manager-preview-2` = WinForms v1.1-preview (Codex-built, in `src/BetterTaskManager`, still installed on Kaan's PC under `%LOCALAPPDATA%\Programs\Better Task Manager`); **`fluent-ui` = this rebuild** (branched from preview-2, local only, not pushed).
-- Commits on `fluent-ui`:
-  - `9a0a168` WinUI 3 rebuild + Core collector
-  - `a1951e4` per-app network throughput (ETW) + Path column
-  - `f3189f3` remote host names
-  - `f80acc2` this handoff document
-  - `3802e22` restart ETW traces stopped by another program; session-name prefix
-  - (next commit) background history service + History page
+- Local clone: **`D:\KI\Claude Code\Better-Task-Manager`** (the old `D:\KI\Codex\…` clone was deleted on Kaan's side).
+- Branches: `main` = stale v1.0 WinForms; `codex/better-task-manager-preview-2` = WinForms v1.1-preview (Codex-built, in `src/BetterTaskManager`); **`fluent-ui` = this rebuild** (branched from preview-2 at `ff029c5`, **pushed to origin**). Releases are cut from `fluent-ui`.
+- **Always push `fluent-ui` after committing.** On 2026-10-03 the only copy (the deleted Codex clone, never pushed) was gone; the branch was rebuilt by replaying this session's transcript (every Write/Edit and file-changing command, in order, on a fresh clone at `ff029c5`) and checked against every file read the transcript recorded (all matched). The replay tooling lives in the session scratchpad (`recover\replay.py`). Commit hashes changed in the process:
+  - `e5d292d` WinUI 3 rebuild + Core collector (was 9a0a168)
+  - `aa8e128` per-app network throughput (ETW) + Path column (was a1951e4)
+  - `d7976b7` remote host names (was f3189f3)
+  - `043c681` this handoff document (was f80acc2)
+  - `7397db0` restart ETW traces stopped by another program; session-name prefix (was 3802e22)
+  - `c93001e` background history service + History page (was 8c7fc1b)
+  - then: release packaging for v2.0.0-alpha.1 (exe renamed to `BetterTaskManager.exe`, installer/scripts switched to the Fluent app)
 - The WinForms project is untouched and still in the solution; retire it only after feature parity.
 
 ## 3. Build, run, test
@@ -28,8 +29,16 @@ Single source of truth for continuing this work in a new session. Read this befo
 ```powershell
 dotnet build BetterTaskManager.slnx -c Release          # whole solution, currently 0 warnings
 dotnet build src/BetterTaskManager.Fluent -c Debug
-src\BetterTaskManager.Fluent\bin\Debug\net11.0-windows10.0.26100.0\win-x64\BetterTaskManager.Fluent.exe --page Network
+src\BetterTaskManager.Fluent\bin\Debug\net11.0-windows10.0.26100.0\win-x64\BetterTaskManager.exe --page Network
 ```
+
+Release (per-user Inno Setup, same AppId as the WinForms preview, so it replaces that install):
+1. Bump `<Version>` in `src/BetterTaskManager.Fluent/BetterTaskManager.Fluent.csproj` and `src/BetterTaskManager.HistoryService/BetterTaskManager.HistoryService.csproj`; commit; **push `fluent-ui`**.
+2. `scripts\publish-fluent.ps1` → `artifacts\BetterTaskManager-v<ver>-portable-win-x64` (+ .zip). Framework-dependent: needs the .NET 11 desktop runtime.
+3. `scripts\build-installer.ps1` → `artifacts\BetterTaskManager-v<ver>-setup-win-x64.exe` + `SHA256SUMS-v<ver>.txt` (numeric file version `2.0.0.<prerelease number>`).
+4. `git tag v<ver>` on `fluent-ui`, push the tag, `gh release create v<ver> --prerelease --target fluent-ui` with the zip, setup and checksums.
+5. Install: `<setup>.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART` (no UAC; installs to `%LOCALAPPDATA%\Programs\Better Task Manager`). Check the installed exe's ProductVersion.
+- The installed history service is **not** updated by setup: after an upgrade, toggle "Record in the background" off/on (or click Turn on) to copy the new service build. A non-silent uninstall removes the service (one UAC prompt); silent uninstalls (what setup uses during upgrades) leave it.
 
 - `--page Processes|Performance|Network|Settings` opens a page directly (used for screenshots).
 - SDK: .NET 11 RC (`11.0.100-rc.1`), Windows App SDK 2.2.0, Windows SDK BuildTools 10.0.28000.2270.
@@ -39,7 +48,7 @@ src\BetterTaskManager.Fluent\bin\Debug\net11.0-windows10.0.26100.0\win-x64\Bette
 
 - **Single instance**: a running copy makes new launches hand over and exit. A running copy also locks `bin\Debug`; build with `-o <scratch folder>` instead of killing Kaan's window.
 - **Elevated copies** cannot be closed, clicked or captured from a non-elevated shell or computer-use (UIPI). Ask Kaan to close them.
-- **computer-use grant**: request the lowercase basename `bettertaskmanager.fluent.exe`; the name "Better Task Manager" resolves to the installed WinForms app. The window may start hidden behind others: restore with `ShowWindow(h, 9)` + `SetForegroundWindow`.
+- **Exe name**: since v2.0.0-alpha.1 the app is `BetterTaskManager.exe` (same name as the old WinForms app and the installed copy). Launch dev builds by full path and check `Get-Process BetterTaskManager | select Path`; never close the installed copy without asking. computer-use grant: request the lowercase basename `bettertaskmanager.exe`. The window may start hidden behind others: restore with `ShowWindow(h, 9)` + `SetForegroundWindow`.
 - When the screen is busy (another session), capture the window with `PrintWindow(hwnd, dc, 2)` after `ShowWindow(h, 4)` (no focus steal).
 - Admin-only features (ETW bandwidth, live DNS) were verified with a **separate elevated console harness** that references Core (`Start-Process -Verb RunAs`, writes results to a file); Kaan approves the UAC prompt. The harness lived in the session scratchpad; recreate it when needed (console exe, `ProjectReference` to Core, call `MonitorEngine.Start()`, set `Paused = true`, then drive `Collect()` once per second). **Always construct it as `new MonitorEngine("BTM-Test")`**: ETW session names are machine-wide, and a harness using the app's default names (`BetterTaskManager-Network`/`-Dns`) stops the running app's traces. That happened once and made Kaan's elevated window show "Admin" in the Network column. Since then the app restarts a lost trace within about 10 s and shows "Paused" with the reason in the tooltip while it waits. This was verified with an elevated harness that took over the sessions deliberately.
 - The first click after a MenuFlyout closes is consumed by light-dismiss (WinUI behaviour, not a bug).
