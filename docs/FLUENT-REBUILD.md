@@ -18,7 +18,7 @@ Single source of truth for continuing this work in a new session. Read this befo
   - Installer keeps the old AppId (so it upgrades the Better Task Manager install) but sets `UsePreviousAppDir=no`, installing to `%LOCALAPPDATA%\Programs\Nax-TaskManager`.
 
 - Local clone: **`D:\KI\Claude Code\Nax-TaskManager`** (renamed from `Better-Task-Manager` on 2026-10-04) (the old `D:\KI\Codex\…` clone was deleted on Kaan's side).
-- Branches: `main` = stale v1.0 WinForms; `codex/better-task-manager-preview-2` = WinForms v1.1-preview (Codex-built, in `src/BetterTaskManager`); **`fluent-ui` = this rebuild** (branched from preview-2 at `ff029c5`, **pushed to origin**). Releases are cut from `fluent-ui`.
+- Branches: **`main` = this app** (fast-forwarded to `fluent-ui` on 2026-10-04; releases are cut from `main`); `codex/better-task-manager-preview-2` = the retired WinForms v1.1-preview. The WinForms project was removed from the tree in 2.0.0-alpha.4 (git history and release v1.1.0-preview.57 keep it).
 - **Always push `fluent-ui` after committing.** On 2026-10-03 the only copy (the deleted Codex clone, never pushed) was gone; the branch was rebuilt by replaying this session's transcript (every Write/Edit and file-changing command, in order, on a fresh clone at `ff029c5`) and checked against every file read the transcript recorded (all matched). The replay tooling lives in the session scratchpad (`recover\replay.py`). Commit hashes changed in the process:
   - `e5d292d` WinUI 3 rebuild + Core collector (was 9a0a168)
   - `aa8e128` per-app network throughput (ETW) + Path column (was a1951e4)
@@ -27,7 +27,6 @@ Single source of truth for continuing this work in a new session. Read this befo
   - `7397db0` restart ETW traces stopped by another program; session-name prefix (was 3802e22)
   - `c93001e` background history service + History page (was 8c7fc1b)
   - then: release packaging for v2.0.0-alpha.1 (exe renamed to `BetterTaskManager.exe`, installer/scripts switched to the Fluent app)
-- The WinForms project is untouched and still in the solution; retire it only after feature parity.
 
 ## 3. Build, run, test
 
@@ -157,13 +156,13 @@ Pitfall: file-based `dotnet run x.cs` harnesses default to AOT settings (reflect
 Implemented as planned below, with these decisions:
 - **Journal mode DELETE, not WAL**: WAL readers need write access to `-shm`; standard users only get read access to the data folder.
 - **Data folder ACL** is set by the service (protected: SYSTEM/Admins full, Users read), because ProgramData lets any user create files in subfolders.
-- **Binaries run from `%ProgramFiles%\Better Task Manager\HistoryService`** (install copies them there): a LocalSystem service must not run from a user-writable folder like the dev `bin`. Updating = toggle on again (stops, copies, reconfigures, starts).
+- **Binaries run from `%ProgramFiles%\Nax-TaskManager\HistoryService`** (install copies them there): a LocalSystem service must not run from a user-writable folder like the dev `bin`. Updating = toggle on again (stops, copies, reconfigures, starts).
 - Service name `BetterTaskManagerHistory`, start delayed-auto, restart on failure (60 s ×3). Uninstall keeps `history.db`.
 - **App key** = lowercase path with version numbers replaced by `*` (`app-*`, `claude_*_x64__…`), so updates don't split an app's history; svchost = `svchost:<first service>`; unknown/exited = `pid:<n>`.
 - Loopback excluded; TCP rows come from the connection table (idle connections count), UDP rows only from ETW flows (only they know the remote side, e.g. QUIC), UDP flow ends after 60 s idle.
 - UI: History page (Ctrl+4) = apps by data used (range Today / 7 / 30 days) + connection log (latest 1000, search box filters via SQL LIKE, auto-refresh 10 s); Settings → History card with toggle + privacy note.
 
-Verified: non-elevated `--console` run recorded 50 TCP connections across 14 apps (21 named) and the reader harness read them back; History page empty state renders. **Not yet verified: byte counts from ETW in the service, install/uninstall via the toggle (needs UAC), running as LocalSystem, the populated History page.**
+Verified (2026-09-27, non-elevated console run): 50 TCP connections across 14 apps recorded and read back. Elevated/LocalSystem verification: see the live-feed paragraph above.
 
 Original plan:
 
@@ -179,7 +178,7 @@ Original plan:
 
 1. German localization (resource-based; UI strings only — never translate process names, titles or paths; the WinForms app did and corrupted them).
 2. Details view (all columns, user per process), startup apps, efficiency mode.
-3. Installer/CI switch to the Fluent app (preview branch has Inno Setup + `windows-ci.yml` running `--self-test/--ui-smoke-test` on the WinForms exe), then retire WinForms.
+3. ~~Installer/CI switch to the Fluent app, then retire WinForms~~ — done in 2.0.0-alpha.1 to alpha.4.
 4. Optional: ask-on-connect prompts need a WFP callout driver or block-by-default + blocked-event notifications (simplewall's approach); not planned yet.
 
 ## 10. Review findings on the WinForms builds (for reference)
