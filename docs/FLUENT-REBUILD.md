@@ -197,16 +197,13 @@ Kaan asked to "do all" of: housekeeping, testing pass, the open gaps, network wo
 - **WFP blocking** (Bitdefender made netsh rules ineffective) — see section 6.
 - Network phase (section 8b): app identity rules, short-lived process names, scope/direction, per-app DNS attribution + DNS rows (hidden behind the History "DNS lookups" toggle), VPN tunnel marking, feed smoothing, service update prompt.
 
-**In progress: German localization** (uncommitted on `main` at the time of writing; backed up on branch `localization`):
-- Mechanism verified with a spike: `Strings/<lang>/Resources.resw` (en-US, de-DE) are compiled into `NaxTaskManager.pri`; `x:Uid` works in the unpackaged app and `Services/Loc.cs` (`Loc.Get`, `Loc.F`, MRT Core `ResourceLoader`) works from code. `Loc.ApplyLanguage(setting)` sets `Microsoft.Windows.Globalization.ApplicationLanguages.PrimaryLanguageOverride` + UI culture in `Program.Main` before XAML loads; `--lang de-DE|en-US` overrides for tests. Setting `AppSettings.Language` ("System"/"en-US"/"de-DE"), Settings has a Language card with "Restart now" (`App.Restart()` keeps elevation).
-- Done in the tree: all literal UI attributes in XAML tagged with `x:Uid="<Page>_<n>"` by `tools/loc-wip/loc_xaml.py` (110 entries listed in `loc_xaml.json`; key format `<Uid>.<Property>`, attached properties as `<Uid>.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip` / `<Uid>.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name`). Product name, "CPU", "TCP", "UDP" are not tagged.
-- Next steps:
-  1. Run `tools/loc-wip/patch_loc_code.py` (converts ~150 C# UI strings to `Loc.Get/F`; anchors were checked against the current files, incl. indentation of the cleanup button labels; it also adds `CleanupFailure`/`Code` to `Core.Native.CleanupResult`). The Python edit helper asserts each anchor once.
-  2. Add to `Loc.cs`: `State(string)` (connection states → `State_*` keys), `Scope(string)` (labels from `IpScopes.Label` → `Scope_*`), `AppName(string)` ("Operating System", "Service Host: " prefix, "Exited process (PID " prefix — Core keeps English because it also writes the history DB), `NetworkStatus(string)` (Core status strings and the two prefixes → `Status_*`), `CleanupFailure(CleanupResult)` (`Cleanup_*`).
-  3. Generate both `Resources.resw` from `tools/loc-wip/translations.py` (`CODE` key→(en,de); `XAML` English→German applied to `loc_xaml.json` keys; XML-escape values, keep `xml:space="preserve"`). Remove the spike keys `SpikeTitle.Text`/`Spike`.
-  4. Build, run with `--lang de-DE` and `--lang en-US`, screenshot every page (PrintWindow) and check nothing English is left in German and nothing is truncated (German strings are longer: check headers and command bar).
-  5. Release, install (elevated script `verify\install-release.ps1` closes only the installed app), delete `tools/loc-wip`.
-- Kaan's PC runs German Windows, so "System" will show German after this ships.
+**German localization — done (2.0.0-alpha.7):**
+- `Strings/<lang>/Resources.resw` (en-US, de-DE) are the source of truth and compile into `NaxTaskManager.pri`. XAML uses `x:Uid="<Page>_<n>"` (keys `<Uid>.<Property>`; attached properties as `<Uid>.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip` / `<Uid>.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name`). Code uses `Loc.Get(key)` / `Loc.F(key, args)` (`Services/Loc.cs`, MRT Core `ResourceLoader`). Product name, "CPU", "TCP", "UDP" are not translated.
+- Core keeps English wording (it also writes the history DB); `Loc.State`, `Loc.Scope`, `Loc.AppName` ("Operating System", "Service Host: ", "Exited process (PID "), `Loc.NetworkStatus` and `Loc.CleanupFailure` (uses `CleanupResult.Failure`/`Code`) map it for display. A new Core string shown in the UI needs a mapping there.
+- `Loc.ApplyLanguage(setting)` runs in `Program.Main` before XAML (`PrimaryLanguageOverride` + UI culture); `--lang de-DE|en-US` overrides for tests. Settings → Language ("System"/"en-US"/"de-DE") applies after "Restart now".
+- Adding a string: add the key to **both** resw files. Wording follows the German Task Manager (Prozessstruktur beenden, In Verwendung, Zugesichert, Datenträger, Herausgeber, Dateipfad öffnen).
+- Verified with `--lang` runs and PrintWindow captures of every page in both languages, plus menu/flyout names via UIA (flyouts are separate popups that PrintWindow does not capture). German forced wider defaults: Processes Memory 130 / Disk 140, History protocol column 260.
+- Kaan's PC runs German Windows, so "System" shows German.
 
 **Not started:** Details view (all columns incl. user per process), startup apps, efficiency mode (EcoQoS via `SetProcessInformation(ProcessPowerThrottling)` + `IDLE_PRIORITY_CLASS`, like Task Manager). **Out of scope, to be explained to Kaan:** ask-before-connect prompts need a WFP callout driver (kernel driver signing) — Portmaster has one, we deliberately do not.
 
@@ -214,7 +211,7 @@ Kaan asked to "do all" of: housekeeping, testing pass, the open gaps, network wo
 
 ## 9. Later roadmap
 
-1. German localization (resource-based; UI strings only — never translate process names, titles or paths; the WinForms app did and corrupted them).
+1. ~~German localization~~ — done in 2.0.0-alpha.7 (see 8c).
 2. Details view (all columns, user per process), startup apps, efficiency mode.
 3. ~~Installer/CI switch to the Fluent app, then retire WinForms~~ — done in 2.0.0-alpha.1 to alpha.4.
 4. Optional: ask-on-connect prompts need a WFP callout driver or block-by-default + blocked-event notifications (simplewall's approach); not planned yet.
