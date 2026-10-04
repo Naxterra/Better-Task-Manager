@@ -144,7 +144,13 @@ Built but not yet seen on screen or exercised by hand: Path column, Processes Ne
 
 Known limitations: English only; theme brushes resolved in code-behind (Performance legend) follow the app theme at page creation; per-app transfer totals reset when the app restarts (no persistence yet); IPv6 link-local addresses are not named by design.
 
-## 8. Background history service (Portmaster-style) — built, admin path not yet verified
+## 8. Background history service (Portmaster-style) — verified 2026-10-04, installed on Kaan's PC
+
+**Live feed (2.0.0-alpha.3)**: the service also publishes every sample on the named pipe `NaxTaskManager.NetworkFeed` (`Core/Feed/NetworkFeed.cs`): 4-byte length + source-generated JSON `NetworkFeedMessage` (per-process rates/totals keyed by PID + creation time, per-socket rates). DACL: SYSTEM/Admins full, Authenticated Users read only (so users cannot create rogue pipe instances once the service owns the name). The non-elevated app (`MonitorEngine.UseServiceFeed()`, called by MonitorHost when not elevated) only trusts the pipe if `GetNamedPipeServerProcessId` equals the service PID from `QueryServiceStatusEx`; it retries on any failure. While a reader is connected the service samples every 1 s (else 2 s). `SystemSample.PerProcessNetworkFromService` drives the UI wording. Data column totals from the service count since the service started watching each process.
+Verified: non-elevated engine switched to the feed within 1 s; a 2 MiB/s-capped 25 MB curl download read avg ≈16.8 Mbit/s with its connection row; installed app (non-elevated) shows Data/Speed and "measured by the History service". The service recorded each 25,000,000-byte download as 25.04 MB (TLS overhead) with host speed.cloudflare.com; data folder ACL as designed. Per-tick feed rates jitter (1-s windows of two unsynchronised samplers); averages are right.
+Note: VPN traffic is counted twice in "all apps" totals — once for the app and once for the WireGuard tunnel service that carries it (seen: IDM 4.0 GB and WireGuard 4.3 GB on the same day).
+Pitfall: file-based `dotnet run x.cs` harnesses default to AOT settings (reflection-based JSON and COM/WMI disabled); add `#:property PublishAot=false` to mirror the app.
+
 
 Implemented as planned below, with these decisions:
 - **Journal mode DELETE, not WAL**: WAL readers need write access to `-shm`; standard users only get read access to the data folder.
