@@ -174,6 +174,19 @@ Original plan:
 6. Privacy note in the UI: ProgramData is readable by local users; fine on Kaan's single-user PC, but say so.
 7. Do not port the WinForms `NetworkHistoryStore` (CSV); it is superseded.
 
+## 8b. Network phase (2.0.0-alpha.5), modelled on Portmaster
+
+Portmaster findings (source read 2026-10-04: service/network/connection.go, netquery/database.go, profile/special.go, profile/fingerprint.go, process/tags/*, resolver/ipinfo.go, netutils/ip.go): apps are profiles matched by fingerprints (tag > cmdline > env > path), svchost per service (suffix `_xxxx` stripped), Store apps by package name + publisher; special profiles "Operating System", "Other Connections", "Network Noise", "System DNS Client"; IP→domain is cached **per profile** from the app's own DNS answers; DNS requests are connection rows of type "dns"; IP scopes HostLocal/LinkLocal/SiteLocal (incl. CGNAT)/Global/Local+GlobalMulticast/Invalid plus inbound/outbound; history is SQLite with per-profile retention; bandwidth comes from its kernel driver (paid tier for history/bandwidth). No special VPN handling found.
+
+What we adopted without a driver:
+- `Core/Monitoring/AppIdentityRules.cs` (keys/names; history rekey = schema 2).
+- DNS-Client ETW events **3006/3008 carry the requesting app's PID** (verified with curl: 3008 pid = curl, internal 3009–3020 pid = Dnscache). `HostNameResolver.Resolve(address, pid)` prefers the app's own answer; `QueryAnswered` feeds History DNS rows (protocol "DNS", remote_address = name, local_address = answers; excluded from connection counts).
+- `Core/Network/IpScopes.cs` + TCP direction (local port is a listening port of the same PID) → Network "Scope" column, history `scope`/`inbound` (schema 3).
+- Kernel trace also enables the Process keyword (`ProcessStart/DCStart/Stop`, `KernelImageFileName` → `DevicePaths.ToDosPath`), kept 10 min after exit → History names short-lived processes.
+- `Core/Network/VpnTunnels.cs`: session-0 processes named after tunnel tech (wireguard, openvpn, wintun, tailscale, warp-svc…) are tunnels → badge + excluded from all-apps totals (history `app_usage.tunnel`, schema 4). Verified on Kaan's PC: only "Windscribe Wireguard Tunnel" matches (not the Windscribe UI or "Windscribe Service").
+- Feed smoothing: 3-s average of service messages (measured ±5 % instead of ±40 %).
+- Service update prompt: `HistoryServiceControl.NeedsUpdate` compares ProductVersion of bundled vs installed service.
+
 ## 9. Later roadmap
 
 1. German localization (resource-based; UI strings only — never translate process names, titles or paths; the WinForms app did and corrupted them).
