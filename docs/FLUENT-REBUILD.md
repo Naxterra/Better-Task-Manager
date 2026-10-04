@@ -7,17 +7,17 @@ Single source of truth for continuing this work in a new session. Read this befo
 - Owner: Kaan (Naxterra). .NET developer; wants a partner, not a cheerleader; verify claims with live data.
 - Goal: **replace Windows Task Manager** (numbers must reconcile with it) and get **Portmaster-style per-app network monitoring** without paying for Portmaster (Safing SPN not needed).
 - UI must be **Fluent, not Excel-like, not laggy**. English UI for now; German localization later.
-- GitHub (`github.com/Naxterra/Better-Task-Manager`) is only Kaan's **cloud backup**; nobody else uses it. Commit when asked; **do not push unless asked**.
+- GitHub (`github.com/Naxterra/Nax-TaskManager`, renamed from Better-Task-Manager on 2026-10-04; the old URL redirects) is only Kaan's **cloud backup**; nobody else uses it. Commit when asked; **do not push unless asked**.
 - Kaan's sibling app **DiskLoom** (`D:\KI\Claude Code\DiskLoom`) is WinUI 3 / .NET 11 unpackaged; this rebuild copies its project setup and `Program.Main` pattern.
 
 ## 2. Repository state
 
-- **Name (since 2.0.0-alpha.2, 2026-10-04): Nax-TaskManager**, exe `NaxTaskManager.exe`, service exe `NaxTaskManager.HistoryService.exe`, matching Kaan's other apps (Nax-Copy → NaxCopy.exe). Project folders, namespaces and the repo name are still `BetterTaskManager`/`Better-Task-Manager` (renaming the GitHub repo was offered, not done).
+- **Name (since 2.0.0-alpha.2, 2026-10-04): Nax-TaskManager**, exe `NaxTaskManager.exe`, service exe `NaxTaskManager.HistoryService.exe`, matching Kaan's other apps (Nax-Copy → NaxCopy.exe). Repo and local folder are `Nax-TaskManager`; project folders and namespaces are still `BetterTaskManager.*` (internal only).
   - Identifiers: mutex `Local\Naxterra.NaxTaskManager.SingleInstance`; settings `%LOCALAPPDATA%\NaxTaskManager\settings.json` (falls back to the old `BetterTaskManager\fluent-settings.json` once); crash log `crash.log` there; service `NaxTaskManagerHistory`, binaries in `%ProgramFiles%\Nax-TaskManager\HistoryService`, data `%ProgramData%\NaxTaskManager`; ETW sessions `NaxTaskManager-Network`/`-Dns`/`-History`.
   - Firewall rules are now named `Nax-TaskManager Block <hash>`; old `BetterTaskManager Block <hash>` rules (same hash) still count as blocked and are deleted on unblock.
   - Installer keeps the old AppId (so it upgrades the Better Task Manager install) but sets `UsePreviousAppDir=no`, installing to `%LOCALAPPDATA%\Programs\Nax-TaskManager`.
 
-- Local clone: **`D:\KI\Claude Code\Better-Task-Manager`** (the old `D:\KI\Codex\…` clone was deleted on Kaan's side).
+- Local clone: **`D:\KI\Claude Code\Nax-TaskManager`** (renamed from `Better-Task-Manager` on 2026-10-04) (the old `D:\KI\Codex\…` clone was deleted on Kaan's side).
 - Branches: `main` = stale v1.0 WinForms; `codex/better-task-manager-preview-2` = WinForms v1.1-preview (Codex-built, in `src/BetterTaskManager`); **`fluent-ui` = this rebuild** (branched from preview-2 at `ff029c5`, **pushed to origin**). Releases are cut from `fluent-ui`.
 - **Always push `fluent-ui` after committing.** On 2026-10-03 the only copy (the deleted Codex clone, never pushed) was gone; the branch was rebuilt by replaying this session's transcript (every Write/Edit and file-changing command, in order, on a fresh clone at `ff029c5`) and checked against every file read the transcript recorded (all matched). The replay tooling lives in the session scratchpad (`recover\replay.py`). Commit hashes changed in the process:
   - `e5d292d` WinUI 3 rebuild + Core collector (was 9a0a168)
