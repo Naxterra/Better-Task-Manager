@@ -37,7 +37,7 @@ dotnet build src/BetterTaskManager.Fluent -c Debug
 src\BetterTaskManager.Fluent\bin\Debug\net11.0-windows10.0.26100.0\win-x64\NaxTaskManager.exe --page Network
 ```
 
-CI (\.github/workflows/windows-ci.yml\, every push incl. tags): build solution, classic WinForms self-test + UI smoke test, \publish-fluent.ps1\, 15-s History service console run (runner is elevated, so the kernel trace and SQLite run for real), \uild-installer.ps1\, \	est-installer.ps1\ (separate test AppId: install, upgrade while the app runs (Restart Manager closes it), launch smoke test 10 s + crash-log check, uninstall), upload artifacts. **Any change to scripts/installer must keep CI in step** — v2.0.0-alpha.1 to alpha.3 all failed CI because the workflow still published the WinForms app (fixed 2026-10-04, first green run 37227895411).
+CI (`.github/workflows/windows-ci.yml`, every push incl. tags): build solution, classic WinForms self-test + UI smoke test, `publish-fluent.ps1`, 15-s History service console run (runner is elevated, so the kernel trace and SQLite run for real), `build-installer.ps1`, `test-installer.ps1` (separate test AppId: install, upgrade while the app runs (Restart Manager closes it), launch smoke test 10 s + crash-log check, uninstall), upload artifacts. **Any change to scripts/installer must keep CI in step**: v2.0.0-alpha.1 to alpha.3 all failed CI because the workflow still published the WinForms app (fixed 2026-10-04, first green run 37227895411).
 
 Release (per-user Inno Setup, same AppId as the WinForms preview, so it replaces that install):
 1. Bump `<Version>` in `src/BetterTaskManager.Fluent/BetterTaskManager.Fluent.csproj` and `src/BetterTaskManager.HistoryService/BetterTaskManager.HistoryService.csproj`; commit; **push `fluent-ui`**.
