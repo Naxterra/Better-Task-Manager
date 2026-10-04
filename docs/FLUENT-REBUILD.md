@@ -1,4 +1,4 @@
-# Better Task Manager — Fluent rebuild: handoff
+# Nax-TaskManager (formerly Better Task Manager) — Fluent rebuild: handoff
 
 Single source of truth for continuing this work in a new session. Read this before touching the code.
 
@@ -11,6 +11,11 @@ Single source of truth for continuing this work in a new session. Read this befo
 - Kaan's sibling app **DiskLoom** (`D:\KI\Claude Code\DiskLoom`) is WinUI 3 / .NET 11 unpackaged; this rebuild copies its project setup and `Program.Main` pattern.
 
 ## 2. Repository state
+
+- **Name (since 2.0.0-alpha.2, 2026-10-04): Nax-TaskManager**, exe `NaxTaskManager.exe`, service exe `NaxTaskManager.HistoryService.exe`, matching Kaan's other apps (Nax-Copy → NaxCopy.exe). Project folders, namespaces and the repo name are still `BetterTaskManager`/`Better-Task-Manager` (renaming the GitHub repo was offered, not done).
+  - Identifiers: mutex `Local\Naxterra.NaxTaskManager.SingleInstance`; settings `%LOCALAPPDATA%\NaxTaskManager\settings.json` (falls back to the old `BetterTaskManager\fluent-settings.json` once); crash log `crash.log` there; service `NaxTaskManagerHistory`, binaries in `%ProgramFiles%\Nax-TaskManager\HistoryService`, data `%ProgramData%\NaxTaskManager`; ETW sessions `NaxTaskManager-Network`/`-Dns`/`-History`.
+  - Firewall rules are now named `Nax-TaskManager Block <hash>`; old `BetterTaskManager Block <hash>` rules (same hash) still count as blocked and are deleted on unblock.
+  - Installer keeps the old AppId (so it upgrades the Better Task Manager install) but sets `UsePreviousAppDir=no`, installing to `%LOCALAPPDATA%\Programs\Nax-TaskManager`.
 
 - Local clone: **`D:\KI\Claude Code\Better-Task-Manager`** (the old `D:\KI\Codex\…` clone was deleted on Kaan's side).
 - Branches: `main` = stale v1.0 WinForms; `codex/better-task-manager-preview-2` = WinForms v1.1-preview (Codex-built, in `src/BetterTaskManager`); **`fluent-ui` = this rebuild** (branched from preview-2 at `ff029c5`, **pushed to origin**). Releases are cut from `fluent-ui`.
@@ -29,7 +34,7 @@ Single source of truth for continuing this work in a new session. Read this befo
 ```powershell
 dotnet build BetterTaskManager.slnx -c Release          # whole solution, currently 0 warnings
 dotnet build src/BetterTaskManager.Fluent -c Debug
-src\BetterTaskManager.Fluent\bin\Debug\net11.0-windows10.0.26100.0\win-x64\BetterTaskManager.exe --page Network
+src\BetterTaskManager.Fluent\bin\Debug\net11.0-windows10.0.26100.0\win-x64\NaxTaskManager.exe --page Network
 ```
 
 Release (per-user Inno Setup, same AppId as the WinForms preview, so it replaces that install):
@@ -48,7 +53,8 @@ Release (per-user Inno Setup, same AppId as the WinForms preview, so it replaces
 
 - **Single instance**: a running copy makes new launches hand over and exit. A running copy also locks `bin\Debug`; build with `-o <scratch folder>` instead of killing Kaan's window.
 - **Elevated copies** cannot be closed, clicked or captured from a non-elevated shell or computer-use (UIPI). Ask Kaan to close them.
-- **Exe name**: since v2.0.0-alpha.1 the app is `BetterTaskManager.exe` (same name as the old WinForms app and the installed copy). Launch dev builds by full path and check `Get-Process BetterTaskManager | select Path`; never close the installed copy without asking. computer-use grant: request the lowercase basename `bettertaskmanager.exe`. The window may start hidden behind others: restore with `ShowWindow(h, 9)` + `SetForegroundWindow`.
+- **Exe name**: `NaxTaskManager.exe` for both dev and installed builds, sharing one single-instance mutex: while one runs, launching the other hands over to it. Launch dev builds by full path and check `Get-Process NaxTaskManager | select Path`; never close the installed copy without asking. computer-use grant: `naxtaskmanager.exe`.
+- **UI checks without touching Kaan's input**: scratchpad `verify\uia.ps1` (UI Automation Invoke/Toggle by accessible name, e.g. "Sort by State") and `verify\rows.ps1` (row order). Header buttons carry `AutomationProperties.Name="Sort by …"`, rows announce their name. A test window that pops up may get clicked by Kaan; re-read state rather than trusting one read. The window may start hidden behind others: restore with `ShowWindow(h, 9)` + `SetForegroundWindow`.
 - When the screen is busy (another session), capture the window with `PrintWindow(hwnd, dc, 2)` after `ShowWindow(h, 4)` (no focus steal).
 - Admin-only features (ETW bandwidth, live DNS) were verified with a **separate elevated console harness** that references Core (`Start-Process -Verb RunAs`, writes results to a file); Kaan approves the UAC prompt. The harness lived in the session scratchpad; recreate it when needed (console exe, `ProjectReference` to Core, call `MonitorEngine.Start()`, set `Paused = true`, then drive `Collect()` once per second). **Always construct it as `new MonitorEngine("BTM-Test")`**: ETW session names are machine-wide, and a harness using the app's default names (`BetterTaskManager-Network`/`-Dns`) stops the running app's traces. That happened once and made Kaan's elevated window show "Admin" in the Network column. Since then the app restarts a lost trace within about 10 s and shows "Paused" with the reason in the tooltip while it waits. This was verified with an elevated harness that took over the sessions deliberately.
 - The first click after a MenuFlyout closes is consumed by light-dismiss (WinUI behaviour, not a bug).
@@ -129,6 +135,8 @@ Network page columns: App/protocol | Local address | Remote host | State | Speed
 - Host names: a name the app looked up always beats reverse DNS; reverse names are labelled as such in the tooltip.
 
 ## 7. Status
+
+2.0.0-alpha.2 (2026-10-04): Network page sortable (App, Remote host, State, Data, Speed; default App A→Z, persisted as `NetworkSortColumn/Descending`; connections inside a group keep a fixed order unless sorted by host or speed), new Data column (bytes since the app started watching), Pause button, idle speeds blank. Performance page "Free up memory" (trim app working sets; clear standby cache and empty all working sets need admin; result shows In use/standby/free before → after). `Core/Native/MemoryCleanup.cs` is the port of the WinForms actions; the non-elevated refusal path was verified, the actual cleanup actions were not run (they would have trimmed Kaan's running game).
 
 Done and verified on screen: Processes (sections, groups, icons, heat, sort, search, context menu, selection persistence), Performance (CPU/Memory/Network charts, memory breakdown), Network (grouped connections, speed per app and per connection, totals, active-only filter), Settings (interval, theme, elevation, about), light/dark theme, single-instance handover to an elevated copy.
 
