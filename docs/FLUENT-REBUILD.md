@@ -106,7 +106,8 @@ src/BetterTaskManager.Fluent    (WinUI 3 unpackaged, self-contained WinAppSDK, D
 
 Data flow: `MonitorEngine` (thread pool, `Interval` default 1 s) → `SnapshotReady` → `MonitorHost` (keeps only the newest pending snapshot, `DispatcherQueue.TryEnqueue`) → `Updated` → the visible page calls its view model's `Refresh()`.
 
-Processes page columns: Name | CPU | Memory (private WS) | Disk/I/O | Network (Mbit/s, admin) | Connections | Publisher | Path.
+Processes page columns (by app): Name | CPU | Memory (private WS) | Disk/I/O | Network (Mbit/s, admin) | Connections | GPU | Publisher | Path. All processes: Name | PID | Status | User | CPU | Memory | GPU | Description.
+GPU = busiest engine per process from the PDH `\GPU Engine(*)\Utilization Percentage` counters (`Core/Native/GpuCounters`, no admin needed, about 1 to 9 ms per read; one wildcard query picks up new processes); header = busiest engine summed over all processes; groups sum their members (capped at 100).
 Network page columns: App/protocol | Local address | Remote host | State | Speed (down/up).
 
 ## 5. Verified facts (measured on Kaan's PC, 20 logical CPUs, ~300 processes)
